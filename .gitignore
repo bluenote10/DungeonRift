@@ -7,3 +7,7 @@ project/target/
 .classpath
 .cache
 .project
+
+src/main/java/
+
+

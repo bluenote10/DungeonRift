@@ -13,6 +13,9 @@ mainClass := Some("com.github.bluenote.RiftExample")
 
 libraryDependencies += "org.saintandreas" % "jovr" % "0.4.4.0"
 
+libraryDependencies += "com.vividsolutions" % "jts" % "1.13"
+
+libraryDependencies += "batik" % "batik-svggen" % "1.6-1"
 
 // --------------------------------
 // Fork settings:

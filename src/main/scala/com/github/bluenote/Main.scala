@@ -25,7 +25,7 @@ import com.sun.jna.Structure
 
 
 
-object RiftExample {
+object Main {
 
   /**
    * Initializes libOVR and returns the Hmd instance
