@@ -17,6 +17,17 @@ libraryDependencies += "com.vividsolutions" % "jts" % "1.13"
 
 libraryDependencies += "batik" % "batik-svggen" % "1.6-1"
 
+
+// *** logging
+
+libraryDependencies += "com.typesafe" %% "scalalogging-slf4j" % "1.1.0"
+
+libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.6"
+
+libraryDependencies += "org.slf4j" % "slf4j-simple" % "1.7.6"
+// libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.1.1"
+
+
 // --------------------------------
 // Fork settings:
 // --------------------------------

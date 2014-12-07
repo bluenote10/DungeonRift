@@ -56,6 +56,14 @@ object ImageGenerator {
     img
   }
   
+  /**
+   * It looks like it is not possible to clip a Path2D, so this simple draws 
+   * the shells of all PolygonWithHoles and ignores the holes. 
+   */
+  def writePolygons(filename: String, polygonSet: PolygonSet) {
+    writePolygons(filename, polygonSet.shellPolygons)
+  }
+  
   def writePolygons(filename: String, polygons: Array[Polygon]) {
     val minX = polygons.map(_.points.map(_.x).min).min
     val maxX = polygons.map(_.points.map(_.x).max).max
@@ -80,6 +88,10 @@ object ImageGenerator {
     }
   }
   
+  /**
+   * This follows the example from:
+   *   http://xmlgraphics.apache.org/batik/using/svg-generator.html
+   */
   def writeSVG(filename: String)(painter: Graphics2D => Unit) {
     val domImpl = GenericDOMImplementation.getDOMImplementation
     val svgNS = "http://www.w3.org/2000/svg"

@@ -7,9 +7,15 @@ import com.vividsolutions.jts.geom.{ Polygon => JtsPolygon }
 import com.vividsolutions.jts.geom.{ MultiPolygon => JtsMultiPolygon }
 import com.vividsolutions.jts.geom.{ Coordinate => JtsCoordinate }
 import com.vividsolutions.jts.geom.{ LinearRing => JtsLinearRing }
+import com.vividsolutions.jts.geom.{ LineString => JtsLineString }
 import com.vividsolutions.jts.geom.GeometryFactory
 import com.vividsolutions.jts.operation.union.CascadedPolygonUnion
 import scala.collection.mutable.ArrayBuffer
+import org.poly2tri.geometry.polygon.{ Polygon => P2TPolygon }
+import org.poly2tri.geometry.polygon.{ PolygonPoint => P2TPoint }
+import org.poly2tri.triangulation.TriangulationProcess
+import org.poly2tri.triangulation.TriangulationAlgorithm
+import org.poly2tri.Poly2Tri
 
 /*
 import uk.co.geolib.geopolygons.C2DPolygon
@@ -53,68 +59,167 @@ object JtsFactory {
 
 case class Point(x: Float, y: Float) {
   def toJtsCoordinate() = new JtsCoordinate(x, y)
+  def toP2TPoint() = new P2TPoint(x, y)
 }
 
 
 
 case class Polygon(points: Array[Point]) {
 
-  def toJtsPolygon(): JtsPolygon = {
+  def toJtsLinearRing(): JtsLinearRing = {
     val pointsWithRepeatedStart = points :+ points(0)
-    val linearRing = JtsFactory().createLinearRing(pointsWithRepeatedStart.map(_.toJtsCoordinate))
-    val holes: Array[JtsLinearRing] = Array()
-    new JtsPolygon(linearRing, holes, JtsFactory())
+    val pointsWithRepeatedStartConv = pointsWithRepeatedStart.map(_.toJtsCoordinate)
+    val linearRing = JtsFactory().createLinearRing(pointsWithRepeatedStartConv)
+    linearRing
   }
   
+  def toJtsPolygon(): JtsPolygon = {
+    val jtsShell = toJtsLinearRing()
+    val jtsHoles = Array[JtsLinearRing]()
+    val p = new JtsPolygon(jtsShell, jtsHoles, JtsFactory())
+    p
+  }
+  
+  def toP2TPolygon(): P2TPolygon = {
+    val pointsConv = points.map(_.toP2TPoint)
+    val p = new P2TPolygon(pointsConv)
+    p
+  }
+  
+  def triangulate() {
+    val p2tPoly = this.toP2TPolygon
+    //p2tPoly.prepareTriangulation(x$1)
+  }
 }
 
-object Polygon {
-  def createUnion(polygons: Array[Polygon]): Array[Polygon] = {
+
+
+
+
+case class PolygonWithHoles(shell: Polygon, holes: Array[Polygon]) {
+
+  def toJtsPolygon(): JtsPolygon = {
+    val jtsShell = shell.toJtsLinearRing
+    val jtsHoles = holes.map(_.toJtsLinearRing)
+    val p = new JtsPolygon(jtsShell, jtsHoles, JtsFactory())
+    p
+  }
+  
+  def toP2TPolygon(): P2TPolygon = {
+    val pointsConv = shell.points.map(_.toP2TPoint)
+    val p = new P2TPolygon(pointsConv)
+    for (hole <- holes) {
+      p.addHole(hole.toP2TPolygon)
+    }
+    p
+  }
+  
+  def triangulate(): Array[Triangle] = {
+    //val process = new TriangulationProcess(TriangulationAlgorithm.DTSweep)
+    
+    val p2tPoly = this.toP2TPolygon
+    //process.triangulate(p2tPoly)
+    
+    //process.
+    Poly2Tri.triangulate(p2tPoly)
+    //p2tPoly.prepareTriangulation(x$1)
+    
+    val triangles = p2tPoly.getTriangles().map { tri =>
+      Triangle(
+        tri.points(0).getXf(), tri.points(0).getYf(),
+        tri.points(1).getXf(), tri.points(1).getYf(),
+        tri.points(2).getXf(), tri.points(2).getYf()
+      )
+    }
+    
+    triangles.toArray
+  }  
+}
+
+
+case class PolygonSet(polygons: Array[PolygonWithHoles]) {
+  def shellPolygons() = polygons.map(_.shell)
+  
+   def triangulate(): Array[Triangle] = {
+     polygons.map(_.triangulate).flatten 
+   }
+}
+
+
+
+object GeomSetOperations {
+  
+  def createUnion(polygons: Array[Polygon]): PolygonSet = {
+
+    val outPolys = ArrayBuffer[PolygonWithHoles]()
+
     val cascade = new CascadedPolygonUnion(polygons.map(_.toJtsPolygon).to)
     val union = cascade.union()
     val gtype = union.getGeometryType()
-    println(gtype)
-    val outPolys = ArrayBuffer[Polygon]()
+    
+    def convertRingToPolygon(ring: JtsLineString): Polygon = {
+      val coords = ring.getCoordinates()
+      val points = coords.dropRight(1).map(coord => Point(coord.getOrdinate(0).toFloat, coord.getOrdinate(1).toFloat))
+      Polygon(points)
+    }
+    
     for (i <- Range(0, union.getNumGeometries)) {
       val geom = union.getGeometryN(i)
       val gtype = geom.getGeometryType()
       println(gtype)
       geom match {
         case poly: JtsPolygon =>
-          val coords = poly.getExteriorRing().getCoordinates()
-          val points = coords.dropRight(1).map(coord => Point(coord.getOrdinate(0).toFloat, coord.getOrdinate(1).toFloat))
-          outPolys += Polygon(points)
+          val extRing = poly.getExteriorRing()
+          val extPoly = convertRingToPolygon(extRing)
+          val intPolys = Array.tabulate(poly.getNumInteriorRing) { h =>
+            val intRing = poly.getInteriorRingN(h)
+            val intPoly = convertRingToPolygon(intRing)
+            intPoly
+          }
+          outPolys += PolygonWithHoles(extPoly, intPolys)
         case _ => {}
       }
     }
     /*
     if (union.isInstanceOf[JtsMultiPolygon]) {
-      println("yes")
       val mpoly = union.asInstanceOf[JtsMultiPolygon]
-      mpoly.
     }
     */
-    outPolys.toArray
+    PolygonSet(outPolys.toArray)
   }
   
 }
 
 
-case class PolygonWithHoles(points: Array[Point], holes: Array[Polygon]) {
-  
-}
 
+// -------------------------------------------------------------------------------------------
+// Geometric primitives
+// -------------------------------------------------------------------------------------------
 
 case class Rect(x1: Float, x2: Float, y1: Float, y2: Float) {
-  def toPolygon(): Polygon = Polygon(Array(Point(x1,y1),
-                                           Point(x1,y2),
-                                           Point(x2,y2),
-                                           Point(x2,y1)))
+  def toPolygon(): Polygon = Polygon(Array(
+    Point(x1,y1),
+    Point(x1,y2),
+    Point(x2,y2),
+    Point(x2,y1)
+  ))
 }
 
 object Rect {
   def createFromCenter(x: Float, y: Float, w: Float, h: Float) =
     Rect(x-w/2, x+w/2, y-h/2, y+h/2)
+}
+
+case class Triangle(x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float) {
+  def toPolygon(): Polygon = Polygon(Array(
+    Point(x1,y1),
+    Point(x2,y2),
+    Point(x3,y3)
+  ))
+}
+
+object Triangle {
+  // maybe constructors that ensure specific vertex winding?
 }
 
 
@@ -133,10 +238,14 @@ object DungeonGenerator {
     
     val polys = rooms.map(_.toPolygon)
     
-    val polysUnified = Polygon.createUnion(polys)
+    val polysUnified = GeomSetOperations.createUnion(polys)
     
     ImageGenerator.writePolygons("polygons", polys)
     ImageGenerator.writePolygons("polygonsUnified", polysUnified)
+    
+    val triangles = polysUnified.triangulate 
+    
+    ImageGenerator.writePolygons("polygonsTriangulated", triangles.map(_.toPolygon))
   }
   
   def main(args: Array[String]) {
