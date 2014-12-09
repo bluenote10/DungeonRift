@@ -227,7 +227,7 @@ object Triangle {
 
 object DungeonGenerator {
 
-  def generate() {
+  def generate(): Dungeon = {
     
     val numRooms = 20 // Random.nextInt()
     
@@ -246,6 +246,8 @@ object DungeonGenerator {
     val triangles = polysUnified.triangulate 
     
     ImageGenerator.writePolygons("polygonsTriangulated", triangles.map(_.toPolygon))
+    
+    Dungeon(polysUnified)
   }
   
   def main(args: Array[String]) {

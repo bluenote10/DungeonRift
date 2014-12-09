@@ -44,10 +44,12 @@ object Main {
     }
     
     // set hmd caps
-    val hmdCaps = ovrHmdCap_LowPersistence | 
-                  //ovrHmdCap_NoVSync | 
-                  ovrHmdCap_ExtendDesktop | 
-                  ovrHmdCap_DynamicPrediction 
+    val hmdCaps = ovrHmdCap_NoVSync | 
+                  ovrHmdCap_LowPersistence | 
+                  //ovrHmdCap_NoVSync |
+                  //ovrHmdCap_ExtendDesktop | 
+                  //ovrHmdCap_DynamicPrediction |
+                  0
     hmd.setEnabledCaps(hmdCaps)
     
     hmd
@@ -127,45 +129,7 @@ object Main {
   }  
   
 
-  /**
-   * Generates the vertex data of the scene (multiple variants)
-   */
-  def generateSceneVertexData(scene: Int = 0): VertexData = {
-    val approxHalfIpd = 0.064f / 2
-    def linspace(min: Float, max: Float, numSteps: Int) = {
-      min to max by (max-min)/(numSteps-1)
-    }      
-    scene match {
-      case 0 => {
-        val numBlocks = 10
-        val dist = 1.5f
-        val cubeOfCubes = for {
-          x <- linspace(-dist, dist, numBlocks)
-          y <- linspace(-dist, dist, numBlocks)
-          z <- linspace(-dist, dist, numBlocks)
-          if ((math.abs(x) max math.abs(y) max math.abs(z)) > 0.99*dist)
-        } yield {
-          val h = approxHalfIpd
-          VertexDataGen3D_NC.cube(-h, +h, -h, +h, +h, -h, Color.COLOR_FERRARI_RED).transformSimple(Mat4f.translate(x, y, z))
-        }
-        cubeOfCubes.reduce(_ ++ _)
-      }
-      case 1 => {
-        val numBlocks = 10
-        val gridOfCubes = for {
-          x <- linspace(-10, 10, numBlocks)
-          y <- linspace(-10, 10, numBlocks)
-          z <- linspace(-10, 10, numBlocks)
-          if (!(math.abs(x) < 0.5 && math.abs(y) < 0.5 && math.abs(z) < 0.5))
-        } yield {
-          val h = approxHalfIpd
-          VertexDataGen3D_NC.cube(-h, +h, -h, +h, +h, -h, Color.COLOR_CELESTIAL_BLUE).transformSimple(Mat4f.translate(x, y, z))
-        }
-        gridOfCubes.reduce(_ ++ _)
-      }
-    }
-    
-  }
+
 
   /**
    * Main
@@ -178,6 +142,9 @@ object Main {
     // initialize and configure OpenGL
     initOpenGL(hmd)
     configureOpenGL()
+    
+    Mouse.setGrabbed(true)
+    //Mouse.setNativeCursor(arg0)
     
     // start tracking
     hmd.configureTracking(ovrTrackingCap_Orientation | ovrTrackingCap_Position | ovrTrackingCap_MagYawCorrection, 0)
@@ -219,10 +186,14 @@ object Main {
       //ovrDistortionCap_NoSwapBuffers |
       //ovrDistortionCap_FlipInput |
       ovrDistortionCap_TimeWarp |
-      //ovrDistortionCap_Overdrive |
+      ovrDistortionCap_Overdrive |
       //ovrDistortionCap_HqDistortion |
       ovrDistortionCap_Chromatic | 
-      ovrDistortionCap_Vignette
+      ovrDistortionCap_Vignette | 
+      ovrDistortionCap_NoRestore | 
+      //ovrDistortionCap_LinuxDevFullscreen |
+      //ovrDistortionCap_ProfileNoTimewarpSpinWaits |
+      0
     
     // configure rendering
     GlWrapper.checkGlError("before configureRendering")
@@ -240,24 +211,20 @@ object Main {
     checkContiguous(hmdToEyeViewOffsets)
     
     
-    // create vertex data + shader + VBO
-    val vertexData = generateSceneVertexData(scene = 0)
-    val shader = new DefaultLightingShader()
-    
-    val vbo = new StaticVbo(vertexData, shader)
     
     
     // mutable model/world transformation
     var modelR = Mat4f.createIdentity
-    var modelS = Mat4f.createIdentity
-    var modelT = Mat4f.translate(0, 0, -2)
+    var modelS = Mat4f.createIdentity.scale(1f/100,1f/100,1f/100)
+    var modelT = Mat4f.translate(-0.5f, -0.5f, -1)
     
 
     // nested function for handling a few keyboard controls
     def handleKeyboardInput(dt: Float) {
       val ds = 0.001f * dt   //   1 m/s
       val da = 0.09f  * dt   //  90 °/s
-      val dS = 0.001f * dt   //   1 m/s
+
+      val mouseScroll = Mouse.getDWheel() / 120
       
       import Keyboard._
       while (Keyboard.next()) {
@@ -269,42 +236,31 @@ object Main {
           }
         }
       } 
-      if (Keyboard.isKeyDown(KEY_LEFT))   modelT = modelT.translate(-ds, 0, 0)
-      if (Keyboard.isKeyDown(KEY_RIGHT))  modelT = modelT.translate(+ds, 0, 0)
+      if (Keyboard.isKeyDown(KEY_RIGHT))  modelT = modelT.translate(-ds, 0, 0)
+      if (Keyboard.isKeyDown(KEY_LEFT))   modelT = modelT.translate(+ds, 0, 0)
       if (Keyboard.isKeyDown(KEY_UP))     modelT = modelT.translate(0, +ds, 0)
       if (Keyboard.isKeyDown(KEY_DOWN))   modelT = modelT.translate(0, -ds, 0)
       if (Keyboard.isKeyDown(KEY_PRIOR))  modelT = modelT.translate(0, 0, -ds)
       if (Keyboard.isKeyDown(KEY_NEXT))   modelT = modelT.translate(0, 0, +ds)
 
-      if (Keyboard.isKeyDown(KEY_W))      modelR = modelR.rotateYawPitchRollQuaternions(-da, 0, 0, false)
-      if (Keyboard.isKeyDown(KEY_S))      modelR = modelR.rotateYawPitchRollQuaternions(+da, 0, 0, false)
-      if (Keyboard.isKeyDown(KEY_A))      modelR = modelR.rotateYawPitchRollQuaternions(0, 0, +da, false)
-      if (Keyboard.isKeyDown(KEY_D))      modelR = modelR.rotateYawPitchRollQuaternions(0, 0, -da, false)
-      if (Keyboard.isKeyDown(KEY_Q))      modelR = modelR.rotateYawPitchRollQuaternions(0, +da, 0, false)
-      if (Keyboard.isKeyDown(KEY_E))      modelR = modelR.rotateYawPitchRollQuaternions(0, -da, 0, false)
+      if (Keyboard.isKeyDown(KEY_S))      modelT = modelT.translate(0, +ds, 0)
+      if (Keyboard.isKeyDown(KEY_W))      modelT = modelT.translate(0, -ds, 0)
+      if (Keyboard.isKeyDown(KEY_D))      modelT = modelT.translate(-ds, 0, 0)
+      if (Keyboard.isKeyDown(KEY_A))      modelT = modelT.translate(+ds, 0, 0)
 
-      if (Keyboard.isKeyDown(KEY_U))      modelS = modelS.scale(1, 1, 1f+dS)
-      if (Keyboard.isKeyDown(KEY_J))      modelS = modelS.scale(1, 1, 1f-dS)
-      if (Keyboard.isKeyDown(KEY_H))      modelS = modelS.scale(1f+dS, 1, 1)
-      if (Keyboard.isKeyDown(KEY_K))      modelS = modelS.scale(1f-dS, 1, 1)
-      if (Keyboard.isKeyDown(KEY_Z))      modelS = modelS.scale(1, 1f+dS, 1)
-      if (Keyboard.isKeyDown(KEY_I))      modelS = modelS.scale(1, 1f-dS, 1)
+      if (mouseScroll != 0 && !Keyboard.isKeyDown(KEY_LCONTROL)) {
+        modelT = modelT.translate(0, 0, mouseScroll*0.1f)
+      }
+      if (mouseScroll != 0 && Keyboard.isKeyDown(KEY_LCONTROL)) {
+        val dS = 0.05f
+        modelS = modelS.scale(1+dS*mouseScroll, 1+dS*mouseScroll, 1f+dS*mouseScroll)
+      }
+      
     }
     
-    // nested render function
-    def render(P: Mat4f, V: Mat4f) {
-      GlWrapper.clearColor.set(Color(1f, 1f, 1f, 1f))
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-      
-      GlWrapper.checkGlError("render -- before rendering the VBO")
-      shader.use()
-      shader.setProjection(P)
-      shader.setModelview(V*modelT*modelR*modelS)
-      vbo.render()
-      
-      GlWrapper.checkGlError("render -- finished")
-    }
 
+    val dungeon = DungeonGenerator.generate
+    val dungeonRenderer = new DungeonRenderer(dungeon)
 
     // frame timing vars
     var numFrames = 0L
@@ -314,7 +270,7 @@ object Main {
     val trackingLogger: Option[RiftTrackingLogger] = None // Some(new RiftTrackingLogger)
     
     // main loop:  
-    while (!Display.isCloseRequested() && numFrames < 500) {
+    while (!Display.isCloseRequested()) {
       
       val tN = System.currentTimeMillis()
       val dt = tN-tL
@@ -338,37 +294,6 @@ object Main {
       // get tracking by getEyePoses
       val headPoses = hmd.getEyePoses(numFrames.toInt, hmdToEyeViewOffsets)
       checkContiguous(headPoses)
-
-      // get tracking manually
-      /*
-      val predictionTimePoint = frameTiming.ScanoutMidpointSeconds // + 0.002 // frameTiming.ScanoutMidpointSeconds
-      val trackingState = hmd.getSensorState(predictionTimePoint)
-      val manualHeadPoses = {
-        val pose = trackingState.HeadPose.Pose
-        val matPos = Mat4f.translate(pose.Position.x, pose.Position.y, pose.Position.z)
-        val matOri = new Quaternion(pose.Orientation.x, pose.Orientation.y, pose.Orientation.z, pose.Orientation.w).castToOrientationMatrix // LH
-        val euler = new Quaternion(pose.Orientation.x, pose.Orientation.y, pose.Orientation.z, pose.Orientation.w).toEuler()
-        //println(f"yaw = ${euler.yaw}%12.6f    pitch = ${euler.pitch}%12.6f    roll = ${euler.roll}%12.6f")
-        val headPoses = new Posef().toArray(2).asInstanceOf[Array[Posef]]
-        for (eye <- 0 until 2) {
-          val matEye = Mat4f.translate(-eyeRenderDescs(eye).HmdToEyeViewOffset.x, -eyeRenderDescs(eye).HmdToEyeViewOffset.y, -eyeRenderDescs(eye).HmdToEyeViewOffset.z)
-          val V = matPos * matOri * matEye // reverse transformation
-          val origin = V * Vec4f(0,0,0,1)
-          headPoses(eye).Position.x = origin.x
-          headPoses(eye).Position.y = origin.y
-          headPoses(eye).Position.z = origin.z
-          headPoses(eye).Orientation.x = pose.Orientation.x
-          headPoses(eye).Orientation.y = pose.Orientation.y
-          headPoses(eye).Orientation.z = pose.Orientation.z
-          headPoses(eye).Orientation.w = pose.Orientation.w
-          //println(f"$eye    orig x = ${pose.Position.x}   new x = ${headPoses(eye).Position.x}    orig y = ${pose.Position.y}   new y = ${headPoses(eye).Position.y}    orig z = ${pose.Position.z}   new z = ${headPoses(eye).Position.z}")
-        }
-        headPoses
-      }
-      checkContiguous(manualHeadPoses)
-      */
-      
-      val headPosesToUse = headPoses
       
       val nextFrameDelta = (frameTiming.NextFrameSeconds-frameTiming.ThisFrameSeconds)*1000
       val scanoutMidpointDelta = (frameTiming.ScanoutMidpointSeconds-frameTiming.ThisFrameSeconds)*1000
@@ -380,30 +305,31 @@ object Main {
         val eye = hmd.EyeRenderOrder(i)
         val P = projections(eye)
 
-        val pose = headPosesToUse(eye)
+        val pose = headPoses(eye)
         
         //println(f"tracking position: x = ${pose.Position.x}%8.3f    y = ${pose.Position.y}%8.3f    z = ${pose.Position.z}%8.3f")
 
         //val trackingScale = 0.1f
         val matPos = Mat4f.translate(-pose.Position.x, -pose.Position.y, -pose.Position.z) //.scale(trackingScale, trackingScale, trackingScale)
         val matOri = new Quaternion(-pose.Orientation.x, -pose.Orientation.y, -pose.Orientation.z, pose.Orientation.w).castToOrientationMatrix // RH
-        val V = matOri * matPos 
+        val V = matOri * matPos * modelT*modelR*modelS // V*modelT*modelR*modelS
         
         // the old transformation was: matEye * matOri * matPos
         // the matEye correction is no longer needed, since the eye offset is now incorporated into pose.position
         // val matEye = Mat4f.translate(eyeRenderDescs(eye).HmdToEyeViewOffset.x, eyeRenderDescs(eye).HmdToEyeViewOffset.y, eyeRenderDescs(eye).HmdToEyeViewOffset.z)
         
         framebuffers(eye).activate()
-        render(P, V)
+        dungeonRenderer.render(P, V)
         framebuffers(eye).deactivate()
 
         GlWrapper.checkGlError("after hmd.endEyeRender()")
       }
       
       GlWrapper.checkGlError("before hmd.endFrame()")
-      hmd.endFrame(headPosesToUse, eyeTextures)
+      hmd.endFrame(headPoses, eyeTextures)
       GlWrapper.checkGlError("after hmd.endFrame()")
 
+      Display.processMessages()
       //Display.update()
       //Display.swapBuffers()
       //Display.sync(75)

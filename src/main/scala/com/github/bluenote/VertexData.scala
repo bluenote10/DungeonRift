@@ -3,6 +3,7 @@ package com.github.bluenote
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL20
 import org.lwjgl.opengl.GL11
+import scala.collection.mutable.ArrayBuffer
 
 
 
@@ -432,6 +433,35 @@ object VertexDataGen3D_NC {
   }
 
   */
+  
+  
+  /**
+   * Convert Triangles to VertexData
+   */
+  def fromTriangles(triangles: Array[Triangle], color: Color, normal: Vec3f): VertexData = {
+    val carr = color.toArr
+    val narr = normal.toArr
+    
+    val vdat = ArrayBuffer[Float]()
+    triangles.foreach{ t =>
+      vdat += t.x1
+      vdat += t.y1
+      vdat += 0
+      vdat ++= narr
+      vdat ++= carr
+      vdat += t.x2
+      vdat += t.y2
+      vdat += 0
+      vdat ++= narr
+      vdat ++= carr
+      vdat += t.x3
+      vdat += t.y3
+      vdat += 0
+      vdat ++= narr
+      vdat ++= carr
+    }
+    return new VertexData3D_NC(vdat.toArray)
+  }
   
 }
 

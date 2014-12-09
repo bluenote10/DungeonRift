@@ -39,8 +39,9 @@ case class Vec3f(var x: Float, var y: Float, var z: Float) {
   def negate() = Vec3f(-x, -y, -z)
   
   // convenience for VBO construction
-  def arr = Array(x, y, z)
   def toVec4f = Vec4f(x, y, z, 1)
+  def toArr = Array(x, y, z)
+  def arr = Array(x, y, z) // shorthand syntax
 }
 case class Vec4f(var x: Float, var y: Float, var z: Float, var w: Float) {
   
