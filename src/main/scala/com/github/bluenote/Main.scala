@@ -212,12 +212,17 @@ object Main {
     
     
     
+    val gameState = GameState.initialize()
+    val dungeonRenderer = new DungeonRenderer(gameState)
     
     // mutable model/world transformation
+    var worldScale = 0.01f   // scale of 1:100 seems to be a good starting point, 1 m becomes 1 cm... 
+    var worldDistance = -1.5f // 50 cm average monitor distance? 
+    /*
     var modelR = Mat4f.createIdentity
-    var modelS = Mat4f.createIdentity.scale(1f/100,1f/100,1f/100)
+    var modelS = Mat4f.createIdentity.scale(worldscale, worldscale, worldscale)
     var modelT = Mat4f.translate(-0.5f, -0.5f, -1)
-    
+    */
 
     // nested function for handling a few keyboard controls
     def handleKeyboardInput(dt: Float) {
@@ -231,11 +236,12 @@ object Main {
         val (isKeyPress, key, char) = (Keyboard.getEventKeyState(), Keyboard.getEventKey(), Keyboard.getEventCharacter())
         if (isKeyPress) {
           key match {
-            case KEY_F1 => // currently nothing
+            case KEY_F1 => hmd.recenterPose()
             case _ => {}
           }
         }
-      } 
+      }
+      /*
       if (Keyboard.isKeyDown(KEY_RIGHT))  modelT = modelT.translate(-ds, 0, 0)
       if (Keyboard.isKeyDown(KEY_LEFT))   modelT = modelT.translate(+ds, 0, 0)
       if (Keyboard.isKeyDown(KEY_UP))     modelT = modelT.translate(0, +ds, 0)
@@ -255,12 +261,24 @@ object Main {
         val dS = 0.05f
         modelS = modelS.scale(1+dS*mouseScroll, 1+dS*mouseScroll, 1f+dS*mouseScroll)
       }
-      
+      */
+
+      if (Keyboard.isKeyDown(KEY_W))      gameState.move("u")
+      if (Keyboard.isKeyDown(KEY_S))      gameState.move("d")
+      if (Keyboard.isKeyDown(KEY_A))      gameState.move("l")
+      if (Keyboard.isKeyDown(KEY_D))      gameState.move("r")
+
+      if (mouseScroll != 0 && !Keyboard.isKeyDown(KEY_LCONTROL)) {
+        worldDistance += mouseScroll * 0.05f // 5 cm steps
+        println(f"worldDistance = $worldDistance")
+      }
+      if (mouseScroll != 0 && Keyboard.isKeyDown(KEY_LCONTROL)) {
+        worldScale *= 1 + mouseScroll * 0.1f // 10% changes
+        println(f"worldScale = $worldScale")
+      }
     }
     
 
-    val dungeon = DungeonGenerator.generate
-    val dungeonRenderer = new DungeonRenderer(dungeon)
 
     // frame timing vars
     var numFrames = 0L
@@ -312,7 +330,13 @@ object Main {
         //val trackingScale = 0.1f
         val matPos = Mat4f.translate(-pose.Position.x, -pose.Position.y, -pose.Position.z) //.scale(trackingScale, trackingScale, trackingScale)
         val matOri = new Quaternion(-pose.Orientation.x, -pose.Orientation.y, -pose.Orientation.z, pose.Orientation.w).castToOrientationMatrix // RH
-        val V = matOri * matPos * modelT*modelR*modelS // V*modelT*modelR*modelS
+        
+        val rescaledPlayerPosition = gameState.playerPosition * worldScale
+        println(gameState.playerPosition, rescaledPlayerPosition, pose.Position.x, pose.Position.y, pose.Position.z)
+        val worldPos = Mat4f.translate(-rescaledPlayerPosition.x, -rescaledPlayerPosition.y, worldDistance)
+        val worldScl = Mat4f.scale(worldScale, worldScale, worldScale)
+        
+        val V = matOri * matPos * worldPos * worldScl //* modelS * modelT // V*modelT*modelR*modelS
         
         // the old transformation was: matEye * matOri * matPos
         // the matEye correction is no longer needed, since the eye offset is now incorporated into pose.position

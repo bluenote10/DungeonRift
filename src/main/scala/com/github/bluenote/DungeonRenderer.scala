@@ -8,13 +8,18 @@ case class Dungeon(floor: PolygonSet)
 
 
 
-class DungeonRenderer(dungeon: Dungeon) {
+class DungeonRenderer(gameState: GameState) {
 
   // create vertex data + shader + VBO
-  val vertexData = DungeonRenderer.generateVertexData(dungeon)
+  val vertexData = DungeonRenderer.generateVertexData(gameState.dungeon)
   val shader = new DefaultLightingShader()
   
   val vbo = new StaticVbo(vertexData, shader)
+  
+  
+  def update(gameState: GameState) {
+    
+  }
   
   
   def render(P: Mat4f, V: Mat4f) {

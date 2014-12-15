@@ -58,6 +58,14 @@ object JtsFactory {
 
 
 case class Point(x: Float, y: Float) {
+  
+  def *(scalar: Float) = Point(x*scalar, y*scalar)
+  def /(scalar: Float) = Point(x/scalar, y/scalar)
+  def +(scalar: Float) = Point(x+scalar, y+scalar)
+  def -(scalar: Float) = Point(x-scalar, y-scalar)
+  
+  def map(mod: Point => Point) = mod(this)
+  
   def toJtsCoordinate() = new JtsCoordinate(x, y)
   def toP2TPoint() = new P2TPoint(x, y)
 }
@@ -66,6 +74,15 @@ case class Point(x: Float, y: Float) {
 
 case class Polygon(points: Array[Point]) {
 
+  def boundingBox(): Rect = {
+    Rect(
+      points.map(_.x).min,
+      points.map(_.x).max,
+      points.map(_.y).min,
+      points.map(_.y).max
+    )
+  }
+  
   def toJtsLinearRing(): JtsLinearRing = {
     val pointsWithRepeatedStart = points :+ points(0)
     val pointsWithRepeatedStartConv = pointsWithRepeatedStart.map(_.toJtsCoordinate)
@@ -98,6 +115,10 @@ case class Polygon(points: Array[Point]) {
 
 case class PolygonWithHoles(shell: Polygon, holes: Array[Polygon]) {
 
+  def boundingBox(): Rect = {
+    shell.boundingBox
+  }
+  
   def toJtsPolygon(): JtsPolygon = {
     val jtsShell = shell.toJtsLinearRing
     val jtsHoles = holes.map(_.toJtsLinearRing)
@@ -139,10 +160,19 @@ case class PolygonWithHoles(shell: Polygon, holes: Array[Polygon]) {
 
 case class PolygonSet(polygons: Array[PolygonWithHoles]) {
   def shellPolygons() = polygons.map(_.shell)
+
+  def boundingBox(): Rect = {
+    val boxes = polygons.map(_.boundingBox)
+    val minX = boxes.map(_.x1).min
+    val maxX = boxes.map(_.x2).max
+    val minY = boxes.map(_.y1).min
+    val maxY = boxes.map(_.y2).max
+    Rect(minX, maxX, minY, maxY)
+  }
   
-   def triangulate(): Array[Triangle] = {
-     polygons.map(_.triangulate).flatten 
-   }
+  def triangulate(): Array[Triangle] = {
+    polygons.map(_.triangulate).flatten 
+  }
 }
 
 
@@ -203,6 +233,8 @@ case class Rect(x1: Float, x2: Float, y1: Float, y2: Float) {
     Point(x2,y2),
     Point(x2,y1)
   ))
+  
+  def center(): Point = Point((x1+x2)/2, (y1+y2)/2)
 }
 
 object Rect {
