@@ -463,6 +463,10 @@ object VertexDataGen3D_NC {
     return new VertexData3D_NC(vdat.toArray)
   }
   
+  
+  def dummy(): VertexData = {
+    return new VertexData3D_NC(Array())
+  }
 }
 
 

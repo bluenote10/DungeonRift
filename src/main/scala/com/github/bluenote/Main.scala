@@ -144,6 +144,7 @@ object Main {
     configureOpenGL()
     
     Mouse.setGrabbed(true)
+    Keyboard.enableRepeatEvents(true)
     //Mouse.setNativeCursor(arg0)
     
     // start tracking
@@ -215,9 +216,11 @@ object Main {
     val gameState = GameState.initialize()
     val dungeonRenderer = new DungeonRenderer(gameState)
     
+    dungeonRenderer.update(GameStateChange.DungeonLoaded(gameState.dungeon))
+    
     // mutable model/world transformation
     var worldScale = 0.01f   // scale of 1:100 seems to be a good starting point, 1 m becomes 1 cm... 
-    var worldDistance = -1.5f // 50 cm average monitor distance? 
+    var worldDistance = -0.5f // 50 cm average monitor distance? 
     /*
     var modelR = Mat4f.createIdentity
     var modelS = Mat4f.createIdentity.scale(worldscale, worldscale, worldscale)
@@ -237,6 +240,10 @@ object Main {
         if (isKeyPress) {
           key match {
             case KEY_F1 => hmd.recenterPose()
+            case KEY_W => gameState.move("u"); dungeonRenderer.update(GameStateChange.PlayerPosition(gameState.playerPosition))
+            case KEY_S => gameState.move("d"); dungeonRenderer.update(GameStateChange.PlayerPosition(gameState.playerPosition))
+            case KEY_A => gameState.move("l"); dungeonRenderer.update(GameStateChange.PlayerPosition(gameState.playerPosition))
+            case KEY_D => gameState.move("r"); dungeonRenderer.update(GameStateChange.PlayerPosition(gameState.playerPosition))
             case _ => {}
           }
         }
@@ -263,11 +270,13 @@ object Main {
       }
       */
 
-      if (Keyboard.isKeyDown(KEY_W))      gameState.move("u")
-      if (Keyboard.isKeyDown(KEY_S))      gameState.move("d")
-      if (Keyboard.isKeyDown(KEY_A))      gameState.move("l")
-      if (Keyboard.isKeyDown(KEY_D))      gameState.move("r")
-
+      /*
+      if (Keyboard.isKeyDown(KEY_W))      { gameState.move("u"); dungeonRenderer.update(GameStateChange.PlayerPosition(gameState.playerPosition)) }
+      if (Keyboard.isKeyDown(KEY_S))      { gameState.move("d"); dungeonRenderer.update(GameStateChange.PlayerPosition(gameState.playerPosition)) }
+      if (Keyboard.isKeyDown(KEY_A))      { gameState.move("l"); dungeonRenderer.update(GameStateChange.PlayerPosition(gameState.playerPosition)) }
+      if (Keyboard.isKeyDown(KEY_D))      { gameState.move("r"); dungeonRenderer.update(GameStateChange.PlayerPosition(gameState.playerPosition)) }
+      */
+      
       if (mouseScroll != 0 && !Keyboard.isKeyDown(KEY_LCONTROL)) {
         worldDistance += mouseScroll * 0.05f // 5 cm steps
         println(f"worldDistance = $worldDistance")
@@ -332,7 +341,7 @@ object Main {
         val matOri = new Quaternion(-pose.Orientation.x, -pose.Orientation.y, -pose.Orientation.z, pose.Orientation.w).castToOrientationMatrix // RH
         
         val rescaledPlayerPosition = gameState.playerPosition * worldScale
-        println(gameState.playerPosition, rescaledPlayerPosition, pose.Position.x, pose.Position.y, pose.Position.z)
+        //println(gameState.playerPosition, rescaledPlayerPosition, pose.Position.x, pose.Position.y, pose.Position.z)
         val worldPos = Mat4f.translate(-rescaledPlayerPosition.x, -rescaledPlayerPosition.y, worldDistance)
         val worldScl = Mat4f.scale(worldScale, worldScale, worldScale)
         
